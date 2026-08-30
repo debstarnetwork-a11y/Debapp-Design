@@ -1,15 +1,17 @@
 import { Image as ImageIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
+import { supabase } from "@/lib/supabase";
 
 const filters = ["All", "Events", "Partnerships", "Field Work"];
 
 export function Gallery() {
+  const { settings } = useSettings();
   const [activeFilter, setActiveFilter] = useState("All");
-  const [heroImage, setHeroImage] = useState(""); // TODO: Fetch from Supabase
+  const heroImage = settings.heroImageGallery;
   
-  // Create mock items that have categories to make filters work
-  const allItems = [
+  const [galleryItems, setGalleryItems] = useState<any[]>([
     {
       id: "fw-1",
       category: "Field Work",
@@ -60,26 +62,41 @@ export function Gallery() {
       category: "Field Work",
       url: "https://i.ibb.co/spGgFCr4/image-10.jpg"
     }
-  ];
+  ]);
+
+  useEffect(() => {
+    async function fetchGallery() {
+      try {
+        const { data, error } = await supabase
+          .from('gallery_items')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (data && data.length > 0) {
+          // Map DB items to frontend structure and merge with hardcoded ones
+          const dbItems = data.map(item => ({
+            id: item.id,
+            category: item.category,
+            url: item.image_url
+          }));
+          
+          setGalleryItems(prev => {
+            // Filter out any duplicates if they accidentally got seeded
+            const existingIds = new Set(prev.map(p => p.id));
+            const newItems = dbItems.filter(item => !existingIds.has(item.id));
+            return [...newItems, ...prev];
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching gallery:', err);
+      }
+    }
+    fetchGallery();
+  }, []);
 
   const filteredItems = activeFilter === "All" 
-    ? allItems 
-    : allItems.filter(item => item.category === activeFilter);
-
-  /* 
-   * TODO: SUPABASE INTEGRATION
-   * 
-   * const [images, setImages] = useState([]);
-   * 
-   * useEffect(() => {
-   *   async function fetchGallery() {
-   *     // Fetch gallery images from Supabase Storage bucket 'imrc-gallery'
-   *     const { data, error } = await supabase.storage.from('imrc-gallery').list();
-   *     if (data) setImages(data);
-   *   }
-   *   fetchGallery();
-   * }, []);
-   */
+    ? galleryItems 
+    : galleryItems.filter(item => item.category === activeFilter);
 
   return (
     <div className="flex flex-col w-full">

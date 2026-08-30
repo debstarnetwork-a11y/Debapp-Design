@@ -2,21 +2,37 @@ import React, { useState } from "react";
 import { ShieldCheck, Mail, Lock, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 
 export function AdminLogin() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+    
     const formData = new FormData(e.target as HTMLFormElement);
     const email = (formData.get('email') as string || "").trim().toLowerCase();
     const password = (formData.get('password') as string || "").trim();
 
-    if (email === "debstarnetwork@gmail.com" && password === "admin2334") {
-      navigate('/admin-dashboard');
-    } else {
-      setError("Invalid credentials. Please try again.");
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (authError) {
+        setError(authError.message);
+      } else {
+        navigate('/admin-dashboard');
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -87,8 +103,8 @@ export function AdminLogin() {
           </div>
 
           <div>
-            <Button type="submit" variant="primary" className="w-full justify-center text-sm">
-              Authenticate
+            <Button type="submit" variant="primary" className="w-full justify-center text-sm" disabled={loading}>
+              {loading ? "Authenticating..." : "Authenticate"}
             </Button>
           </div>
         </form>

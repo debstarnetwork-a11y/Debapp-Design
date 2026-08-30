@@ -3,35 +3,42 @@ import { MapPin, Mail, User, Shield, Info, Handshake, CheckCircle2, Phone } from
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
+import { supabase } from "@/lib/supabase";
 
 export function Contact() {
   const { settings } = useSettings();
-  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const heroImage = settings.heroImageContact;
   const contactEmail = settings.email;
   const contactPhone = settings.phone;
   const contactLocation = settings.location;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    /*
-     * TODO: SUPABASE INTEGRATION
-     * 
-     * const formData = new FormData(e.target as HTMLFormElement);
-     * const data = Object.fromEntries(formData.entries());
-     * 
-     * const { error } = await supabase
-     *   .from('contact_submissions')
-     *   .insert([data]);
-     * 
-     * if (error) {
-     *   setStatus("error");
-     * } else {
-     *   setStatus("success");
-     * }
-     */
-    setStatus("success");
-    setTimeout(() => setStatus("idle"), 5000);
+    setStatus("submitting");
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+      const { error } = await supabase
+        .from('contact_submissions')
+        .insert([data]);
+      
+      if (error) {
+        console.error("Supabase insert error:", error);
+        setErrorMessage(error.message || "There was an error submitting your message.");
+        setStatus("error");
+      } else {
+        setStatus("success");
+        (e.target as HTMLFormElement).reset();
+        setTimeout(() => setStatus("idle"), 5000);
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      setStatus("error");
+    }
   };
 
   return (
@@ -69,7 +76,7 @@ export function Contact() {
               {status === "error" && (
                 <div className="mb-6 p-4 bg-imrc-error/10 border border-imrc-error rounded-[8px] flex items-start gap-3">
                   <Info className="w-5 h-5 text-imrc-error shrink-0 mt-0.5" />
-                  <p className="text-sm text-imrc-error font-medium">There was an error submitting your message. Please try again or email us directly.</p>
+                  <p className="text-sm text-imrc-error font-medium">{errorMessage || "There was an error submitting your message. Please try again or email us directly."}</p>
                 </div>
               )}
 
@@ -136,8 +143,8 @@ export function Contact() {
                   ></textarea>
                 </div>
 
-                <Button type="submit" variant="primary" className="w-full justify-center">
-                  Secure Submit
+                <Button type="submit" variant="primary" className="w-full justify-center" disabled={status === "submitting"}>
+                  {status === "submitting" ? "Submitting..." : "Secure Submit"}
                 </Button>
               </form>
             </div>

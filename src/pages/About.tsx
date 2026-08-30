@@ -1,36 +1,12 @@
 import { Shield, Globe, Star } from "lucide-react";
-import { useState } from "react";
+import { useSettings } from "@/contexts/SettingsContext";
 import { cn } from "@/lib/utils";
 
 export function About() {
-  const [heroImage, setHeroImage] = useState(""); // TODO: Fetch from Supabase
-
-  const team = [
-    {
-      name: "Anita D. Benz",
-      title: "Secretary for Emergency and Rehabilitation Fund",
-      email: "serviceteamatm@gmail.com",
-      initials: "AB",
-      image: "https://i.ibb.co/5hK1jcC5/Anita-D-Benz.jpg",
-      icon: <Shield className="w-6 h-6 text-imrc-accent" />
-    },
-    {
-      name: "Alfred Kammer",
-      title: "Director of the Europe Department, International Monetary Cooperation",
-      email: null,
-      initials: "AK",
-      image: "https://i.ibb.co/yBYb37DQ/Alfred-Karmer-01.jpg",
-      icon: <Globe className="w-6 h-6 text-imrc-accent" />
-    },
-    {
-      name: "Kristalina Georgieva",
-      title: "IMF Managing Director",
-      email: null,
-      initials: "KG",
-      image: "https://i.ibb.co/twr6n85Z/Kristalina-Georgieva-01.jpg",
-      icon: <Star className="w-6 h-6 text-imrc-accent" />
-    }
-  ];
+  const { settings } = useSettings();
+  const heroImage = settings.heroImageAbout;
+  const legacyImage = settings.imageLegacy;
+  const team = settings.teamMembers || [];
 
   return (
     <div className="flex flex-col w-full">
@@ -64,7 +40,7 @@ export function About() {
           {/* Legacy of Protection Image */}
           <div className="relative w-full max-w-lg mx-auto overflow-hidden rounded-[24px] shadow-card">
             <img 
-              src="https://i.ibb.co/GfSmfpGV/Image-2.png" 
+              src={legacyImage || "https://i.ibb.co/GfSmfpGV/Image-2.png"} 
               alt="Our Legacy of Protection" 
               className="w-full h-auto object-cover block" 
             />
@@ -78,7 +54,9 @@ export function About() {
           <h2 className="mb-16">Global Leadership</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {team.map((member, i) => (
+            {team.map((member, i) => {
+              const Icon = i === 0 ? Shield : i === 1 ? Globe : Star;
+              return (
               <div key={i} className="bg-white p-8 rounded-[12px] shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-[6px] border border-gray-100 flex flex-col items-center text-center">
                 <div className="relative mb-6">
                   <div className="w-24 h-24 rounded-full bg-imrc-primary flex items-center justify-center border-4 border-imrc-accent shadow-md overflow-hidden">
@@ -89,7 +67,7 @@ export function About() {
                     )}
                   </div>
                   <div className="absolute -bottom-2 -right-2 bg-white p-2 rounded-full shadow-sm z-10">
-                    {member.icon}
+                    <Icon className="w-6 h-6 text-imrc-accent" />
                   </div>
                 </div>
                 <h3 className="text-xl mb-2">{member.name}</h3>
@@ -102,7 +80,7 @@ export function About() {
                   </a>
                 )}
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </section>
