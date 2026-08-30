@@ -1,0 +1,6 @@
+{
+  "name": "IMRC NGO Portal",
+  "description": "Official website for the International Monetary Rehabilitation Cooperation (IMRC), a global NGO supporting victims of identity theft and financial abuse.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

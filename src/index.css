@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-imrc-primary: #0047AB;
+  --color-imrc-secondary: #FF6600;
+  --color-imrc-accent: #FFD700;
+  --color-imrc-accent-light: #FFE885;
+  --color-imrc-bg: #FFFFFF;
+  --color-imrc-bg-alt: #F3F4F6;
+  --color-imrc-text: #1E1E1E;
+  --color-imrc-muted: #6B7280;
+  --color-imrc-success: #10B981;
+  --color-imrc-error: #EF4444;
+
+  --font-sans: 'Poppins', sans-serif;
+  
+  --shadow-card: 0 4px 20px rgba(0, 71, 171, 0.08);
+  --shadow-card-hover: 0 12px 40px rgba(0, 71, 171, 0.15);
+  --shadow-btn: 0 4px 14px rgba(255, 102, 0, 0.3);
+  --shadow-btn-hover: 0 8px 25px rgba(255, 102, 0, 0.45);
+}
+
+@layer base {
+  body {
+    @apply font-sans text-imrc-text bg-imrc-bg;
+    font-family: 'Poppins', sans-serif;
+    line-height: 1.7;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.2;
+    @apply text-imrc-primary;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    @apply font-bold;
+  }
+  h2 {
+    font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+    @apply font-semibold;
+  }
+  h3 {
+    font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+    @apply font-semibold;
+  }
+}
+
+@layer utilities {
+  .bg-mesh-gradient {
+    background: 
+      radial-gradient(circle at 15% 50%, rgba(77, 168, 218, 0.15), transparent 25%),
+      radial-gradient(circle at 85% 30%, rgba(77, 168, 218, 0.2), transparent 25%);
+    background-color: var(--color-imrc-primary);
+  }
+
+  .bg-mesh-gradient-light {
+    background: 
+      radial-gradient(circle at 15% 50%, rgba(11, 37, 69, 0.05), transparent 25%),
+      radial-gradient(circle at 85% 30%, rgba(245, 166, 35, 0.1), transparent 25%);
+    background-color: var(--color-imrc-secondary);
+  }
+
+  .container-custom {
+    @apply w-full max-w-[1200px] mx-auto px-6;
+  }
+
+  .section-padding {
+    @apply py-12 md:py-20;
+  }
+}
