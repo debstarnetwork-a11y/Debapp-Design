@@ -1,0 +1,22 @@
+{
+  "company": {
+    "name": "Your Company Name",
+    "email": "contact@yourdomain.com",
+    "phone": "+1 234 567 8900",
+    "location": "123 Business Avenue, New York, NY"
+  },
+  "images": {
+    "logo": "https://example.com/logo.png",
+    "hero_about": "https://example.com/about-hero.jpg",
+    "hero_mission": "https://example.com/mission-hero.jpg",
+    "legacy_image": "https://example.com/legacy.jpg"
+  },
+  "team": [
+    {
+      "name": "John Doe",
+      "title": "Chief Executive Officer",
+      "email": "john@example.com",
+      "image": "https://example.com/john.jpg"
+    }
+  ]
+}
