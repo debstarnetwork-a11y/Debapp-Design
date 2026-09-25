@@ -38,17 +38,41 @@ export function AIChatWidget() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message: userMessage.content }),
-      });
+      // Try /api/chat.php first (for cPanel/PHP), fallback to /api/chat (for Node/Vercel)
+      let response: Response | null = null;
+      let text = "";
+      let data: any = null;
 
-      const data = await response.json();
+      const endpoints = ["/api/chat.php", "/api/chat"];
+      let lastError = "";
 
-      if (response.ok) {
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message: userMessage.content }),
+          });
+
+          const raw = await res.text();
+          try {
+            const parsed = JSON.parse(raw);
+            response = res;
+            text = raw;
+            data = parsed;
+            break; // Successfully got JSON response!
+          } catch {
+            // Not JSON (probably HTML from SPA fallback), try next endpoint
+            lastError = "Server returned non-JSON";
+          }
+        } catch (fetchErr: any) {
+          lastError = fetchErr?.message || "Network request failed";
+        }
+      }
+
+      if (data && response?.ok) {
         setMessages((prev) => [
           ...prev,
           {
@@ -57,23 +81,26 @@ export function AIChatWidget() {
             content: data.reply || "I'm sorry, I couldn't understand that.",
           },
         ]);
-      } else {
+      } else if (data && !response?.ok) {
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: `Error: ${data.error || "Failed to communicate with AI."}`,
+            content: `Notice: ${data.error || "Failed to communicate with AI."}`,
           },
         ]);
+      } else {
+        throw new Error(lastError || "Could not reach AI chat endpoint.");
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Chat error:", error);
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "Network error. Please try again later.",
+          content: error?.message || "Unable to reach the assistant. Please try again.",
         },
       ]);
     } finally {

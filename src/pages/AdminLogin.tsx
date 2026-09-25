@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { ShieldCheck, Mail, Lock, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseUrl } from "@/lib/supabase";
 
 export function AdminLogin() {
   const navigate = useNavigate();
@@ -19,6 +19,12 @@ export function AdminLogin() {
     const password = (formData.get('password') as string || "").trim();
 
     try {
+      if (!supabaseUrl || supabaseUrl.includes('placeholder.supabase.co')) {
+        setError("Supabase project is not linked yet. Please provide your Supabase Project URL and Anon Key.");
+        setLoading(false);
+        return;
+      }
+
       const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -29,8 +35,12 @@ export function AdminLogin() {
       } else {
         navigate('/admin-dashboard');
       }
-    } catch (err) {
-      setError("An unexpected error occurred. Please try again.");
+    } catch (err: any) {
+      if (err?.message?.includes('Failed to fetch') || !supabaseUrl || supabaseUrl.includes('placeholder')) {
+        setError("Cannot reach Supabase. Please ensure your actual Supabase URL and Anon Key are configured.");
+      } else {
+        setError(err?.message || "An unexpected error occurred. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
