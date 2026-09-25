@@ -15,12 +15,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-// 1. Get Gemini API Key (from environment variable or set your key here)
+// 1. Get Gemini API Key (from environment variable or paste directly below)
 $apiKey = getenv('GEMINI_API_KEY') ?: 'YOUR_GEMINI_API_KEY_HERE';
 
 if (!$apiKey || $apiKey === 'YOUR_GEMINI_API_KEY_HERE') {
     http_response_code(500);
-    echo json_encode(['error' => 'Gemini API key is not configured in api/chat.php']);
+    echo json_encode(['error' => 'Gemini API key is not configured in chat.php']);
     exit;
 }
 
