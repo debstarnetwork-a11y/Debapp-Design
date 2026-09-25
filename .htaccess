@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Route /api/chat directly to api/chat.php on PHP/cPanel hosting
+  RewriteRule ^api/chat/?$ api/chat.php [L,QSA]
+
+  # Standard React Single Page App (SPA) Routing:
+  # If request is not an existing file or directory, redirect to index.html
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
