@@ -1,4 +1,4 @@
-import { LayoutDashboard, Image as ImageIcon, MessageSquare, Edit3, Settings, LogOut, CheckCircle2, Save, Send, X, Mail } from "lucide-react";
+import { LayoutDashboard, Image as ImageIcon, MessageSquare, Edit3, Settings, LogOut, CheckCircle2, Save, Send, X, Mail, AlertCircle, Database, Copy, Check } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useSettings } from "../contexts/SettingsContext";
@@ -96,20 +96,93 @@ export function AdminDashboard() {
 
   // Settings Form State
   const [formData, setFormData] = useState(settings);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showSqlModal, setShowSqlModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  const SQL_SCHEMA = `-- Run this in your Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql)
+-- 1. Create tables if they do not exist
+CREATE TABLE IF NOT EXISTS public.settings (
+    id INT PRIMARY KEY DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS public.gallery_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    image_url TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Events',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE IF NOT EXISTS public.contact_submissions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT,
+    subject TEXT,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'New',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+-- 2. Safely add any missing columns to existing settings table
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS hero_image_about TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS hero_image_mission TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS hero_image_vision TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS hero_image_gallery TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS hero_image_contact TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS image_legacy TEXT;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS team_members JSONB;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now());
+
+-- 3. Insert default row 1 into settings if missing
+INSERT INTO public.settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- 4. Enable Row Level Security (RLS)
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.gallery_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contact_submissions ENABLE ROW LEVEL SECURITY;
+
+-- 5. Setup policies so site and admin can read & write
+DROP POLICY IF EXISTS "Public read settings" ON public.settings;
+CREATE POLICY "Public read settings" ON public.settings FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public read gallery" ON public.gallery_items;
+CREATE POLICY "Public read gallery" ON public.gallery_items FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admins all settings" ON public.settings;
+CREATE POLICY "Admins all settings" ON public.settings FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admins all gallery" ON public.gallery_items;
+CREATE POLICY "Admins all gallery" ON public.gallery_items FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public insert contact" ON public.contact_submissions;
+CREATE POLICY "Public insert contact" ON public.contact_submissions FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admins all contact" ON public.contact_submissions;
+CREATE POLICY "Admins all contact" ON public.contact_submissions FOR ALL USING (true) WITH CHECK (true);`;
 
   useEffect(() => {
     setFormData(settings);
   }, [settings]);
 
-  const handleSettingsSave = (e: React.FormEvent) => {
+  const handleSettingsSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveStatus("saving");
-    setTimeout(() => {
-      updateSettings(formData);
+    setSaveError(null);
+    
+    const result = await updateSettings(formData);
+    if (result.success) {
       setSaveStatus("success");
-      setTimeout(() => setSaveStatus("idle"), 3000);
-    }, 800);
+      setTimeout(() => setSaveStatus("idle"), 3500);
+    } else {
+      setSaveStatus("error");
+      setSaveError(result.error || "Failed to save to database. You may need to create tables in Supabase.");
+    }
   };
 
   const handleLogout = async () => {
@@ -184,9 +257,18 @@ export function AdminDashboard() {
       <main className="flex-1 flex flex-col overflow-y-auto">
         <header className="h-20 bg-white shadow-sm flex items-center justify-between px-8 border-b border-gray-100 shrink-0">
           <h1 className="text-2xl font-semibold text-imrc-primary m-0">Dashboard Overview</h1>
-          <Link to="/" className="text-sm font-medium text-imrc-secondary hover:text-imrc-accent transition-colors">
-            View Live Site &rarr;
-          </Link>
+          <div className="flex items-center gap-4">
+            <button 
+              type="button"
+              onClick={() => setShowSqlModal(true)}
+              className="text-xs font-medium text-imrc-primary bg-amber-50 border border-amber-200 hover:bg-amber-100 px-3 py-1.5 rounded-[6px] transition-colors flex items-center gap-1.5"
+            >
+              <Database className="w-3.5 h-3.5 text-amber-600" /> Supabase SQL Setup
+            </button>
+            <Link to="/" className="text-sm font-medium text-imrc-secondary hover:text-imrc-accent transition-colors">
+              View Live Site &rarr;
+            </Link>
+          </div>
         </header>
 
         <div className="p-8 max-w-7xl mx-auto w-full">
@@ -204,18 +286,42 @@ export function AdminDashboard() {
               <button 
                 onClick={handleSettingsSave}
                 disabled={saveStatus === "saving"}
-                className="bg-imrc-secondary hover:bg-imrc-primary text-white px-4 py-2 rounded-[8px] text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-70"
+                className={cn(
+                  "px-4 py-2 rounded-[8px] text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-70",
+                  saveStatus === "error" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-imrc-secondary hover:bg-imrc-primary text-white"
+                )}
               >
                 {saveStatus === "saving" ? (
                   "Saving..."
                 ) : saveStatus === "success" ? (
                   <><CheckCircle2 className="w-4 h-4" /> Saved</>
+                ) : saveStatus === "error" ? (
+                  <><AlertCircle className="w-4 h-4" /> Save Failed</>
                 ) : (
                   <><Save className="w-4 h-4" /> Save Changes</>
                 )}
               </button>
             </div>
             <div className="p-6">
+              {saveError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-[8px] mb-6 flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-sm">Could not save to Supabase database</h4>
+                      <p className="text-xs text-red-600 mt-1">{saveError}</p>
+                      <p className="text-xs text-red-700 mt-2 font-medium">Changes are saved in your local browser cache, but to sync globally you must run the SQL schema in your Supabase project.</p>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowSqlModal(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded shrink-0 ml-4"
+                  >
+                    View SQL Script
+                  </button>
+                </div>
+              )}
               <form className="space-y-6">
                 <div>
                   <h3 className="text-md font-semibold text-imrc-primary mb-4">Page Hero Images</h3>
@@ -640,18 +746,42 @@ export function AdminDashboard() {
               <button 
                 onClick={handleSettingsSave}
                 disabled={saveStatus === "saving"}
-                className="bg-imrc-secondary hover:bg-imrc-primary text-white px-4 py-2 rounded-[8px] text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-70"
+                className={cn(
+                  "px-4 py-2 rounded-[8px] text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-70",
+                  saveStatus === "error" ? "bg-red-600 hover:bg-red-700 text-white" : "bg-imrc-secondary hover:bg-imrc-primary text-white"
+                )}
               >
                 {saveStatus === "saving" ? (
                   "Saving..."
                 ) : saveStatus === "success" ? (
                   <><CheckCircle2 className="w-4 h-4" /> Saved</>
+                ) : saveStatus === "error" ? (
+                  <><AlertCircle className="w-4 h-4" /> Save Failed</>
                 ) : (
                   <><Save className="w-4 h-4" /> Save Changes</>
                 )}
               </button>
             </div>
             <div className="p-6">
+              {saveError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-[8px] mb-6 flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-sm">Could not save to Supabase database</h4>
+                      <p className="text-xs text-red-600 mt-1">{saveError}</p>
+                      <p className="text-xs text-red-700 mt-2 font-medium">Changes are saved in your local browser cache, but to sync globally you must run the SQL schema in your Supabase project.</p>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowSqlModal(true)}
+                    className="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded shrink-0 ml-4"
+                  >
+                    View SQL Script
+                  </button>
+                </div>
+              )}
               <form className="space-y-6">
                 <div>
                   <h3 className="text-md font-semibold text-imrc-primary mb-4">Contact Information</h3>
@@ -761,6 +891,65 @@ export function AdminDashboard() {
                 className="bg-white border border-gray-200 text-imrc-primary px-6 py-2 rounded-[8px] font-medium hover:bg-gray-50 transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supabase SQL Setup Modal */}
+      {showSqlModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[16px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Database className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-imrc-primary m-0">Supabase SQL Schema Setup</h3>
+                  <p className="text-xs text-imrc-muted mt-0.5">Run this script once in your Supabase SQL Editor to enable database syncing.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowSqlModal(false)} className="text-gray-400 hover:text-imrc-primary transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="bg-blue-50 border border-blue-200 text-blue-900 p-4 rounded-[8px] text-xs space-y-1">
+                <p className="font-semibold text-sm text-blue-950">Instructions:</p>
+                <p>1. Open your project on <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" rel="noopener noreferrer" className="underline font-bold text-blue-800">Supabase SQL Editor</a>.</p>
+                <p>2. Click <strong>New Query</strong>, paste the script below, and click <strong>Run</strong>.</p>
+                <p>3. Once executed, returning here to save will sync across all browsers and devices!</p>
+              </div>
+
+              <div className="relative">
+                <div className="flex justify-between items-center bg-gray-900 text-gray-300 px-4 py-2 rounded-t-[8px] text-xs">
+                  <span>SQL Schema Script</span>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(SQL_SCHEMA);
+                      setCopiedSql(true);
+                      setTimeout(() => setCopiedSql(false), 2500);
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-white bg-white/20 hover:bg-white/30 px-3 py-1 rounded transition-colors"
+                  >
+                    {copiedSql ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedSql ? "Copied to clipboard!" : "Copy SQL"}
+                  </button>
+                </div>
+                <pre className="bg-gray-950 text-emerald-400 p-4 rounded-b-[8px] text-xs font-mono overflow-x-auto max-h-[350px] leading-relaxed">
+                  {SQL_SCHEMA}
+                </pre>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
+              <span className="text-xs text-imrc-muted">IMRC Database Configuration</span>
+              <button 
+                onClick={() => setShowSqlModal(false)}
+                className="bg-imrc-secondary hover:bg-imrc-primary text-white px-6 py-2 rounded-[8px] text-sm font-medium transition-colors"
+              >
+                Done
               </button>
             </div>
           </div>
